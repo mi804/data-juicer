@@ -1,5 +1,4 @@
 import copy
-import os
 import traceback
 from functools import wraps
 
@@ -7,7 +6,6 @@ import pyarrow as pa
 from loguru import logger
 
 from data_juicer import is_cuda_available
-from data_juicer.utils.auto_install_utils import AutoInstaller
 from data_juicer.utils.constant import Fields
 from data_juicer.utils.mm_utils import size_to_bytes
 from data_juicer.utils.process_utils import calculate_np
@@ -15,10 +13,6 @@ from data_juicer.utils.registry import Registry
 
 OPERATORS = Registry('Operators')
 UNFORKABLE = Registry('Unforkable')
-current_path = os.path.dirname(os.path.realpath(__file__))
-version_file_path = os.path.join(current_path,
-                                 '../../environments/science_requires.txt')
-AUTOINSTALL = AutoInstaller([version_file_path])
 
 
 def convert_list_dict_to_dict_list(samples):
@@ -236,11 +230,33 @@ class Mapper(OP):
 
         # runtime wrappers
         if self.is_batched_op():
-            self.process = catch_map_batches_exception(self.process)
+            self.process = catch_map_batches_exception(self.process_batched)
         else:
-            self.process = catch_map_single_exception(self.process)
+            self.process = catch_map_single_exception(self.process_single)
 
-    def process(self, sample):
+    # set the process method is not allowed to be overridden
+    def __init_subclass__(cls, **kwargs):
+        not_allowed_list = ['process']
+        for method_name in not_allowed_list:
+            if method_name in cls.__dict__:
+                raise TypeError(
+                    f'Method {method_name} cannot be overridden by subclass '
+                    f'{cls.__name__}. Please implement {method_name}_single '
+                    f'or {method_name}_batched.')
+
+    def process_batched(self, samples, *args, **kwargs):
+        keys = samples.keys()
+        first_key = next(iter(keys))
+        num_samples = len(samples[first_key])
+        for i in range(num_samples):
+            this_sample = {key: samples[key][i] for key in keys}
+            res_sample = self.process_single(this_sample, *args, **kwargs)
+            for key in keys:
+                samples[key][i] = res_sample[key]
+
+        return samples
+
+    def process_single(self, sample):
         """
         For sample level, sample --> sample
 
@@ -285,11 +301,41 @@ class Filter(OP):
         # runtime wrappers
         if self.is_batched_op():
             self.compute_stats = catch_map_batches_exception(
-                self.compute_stats)
+                self.compute_stats_batched)
+            self.process = catch_map_batches_exception(self.process_batched)
         else:
-            self.compute_stats = catch_map_single_exception(self.compute_stats)
+            self.compute_stats = catch_map_single_exception(
+                self.compute_stats_single)
+            self.process = catch_map_single_exception(self.process_single)
 
-    def compute_stats(self, sample, context=False):
+    # set the process method is not allowed to be overridden
+    def __init_subclass__(cls, **kwargs):
+        not_allowed_list = ['compute_stats', 'process']
+        for method_name in not_allowed_list:
+            if method_name in cls.__dict__:
+                raise TypeError(
+                    f'Method {method_name} cannot be overridden by subclass '
+                    f'{cls.__name__}. Please implement {method_name}_single '
+                    f'or {method_name}_batched.')
+
+    def compute_stats_batched(self, samples, *args, **kwargs):
+        keys = samples.keys()
+        num_samples = len(samples[Fields.stats])
+        for i in range(num_samples):
+            this_sample = {key: samples[key][i] for key in keys}
+            res_sample = self.compute_stats_single(this_sample, *args,
+                                                   **kwargs)
+            samples[Fields.stats][i] = res_sample[Fields.stats]
+            if 'context' in kwargs and kwargs['context']:
+                samples[Fields.context][i] = res_sample[Fields.context]
+
+        return samples
+
+    def process_batched(self, samples):
+        return map(lambda stat: self.process_single({Fields.stats: stat}),
+                   samples[Fields.stats])
+
+    def compute_stats_single(self, sample, context=False):
         """
         Compute stats for the sample which is used as a metric to decide
         whether to filter this sample.
@@ -301,7 +347,7 @@ class Filter(OP):
         """
         raise NotImplementedError
 
-    def process(self, sample):
+    def process_single(self, sample):
         """
         For sample level, sample --> Boolean.
 
