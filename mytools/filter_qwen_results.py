@@ -10,6 +10,7 @@ from typing import List
 from parse_qwen2_jsonl import parse_jsonl_file
 import json
 from tqdm import tqdm
+import torchvision.transforms as T
 
 
 if __name__ == "__main__":
@@ -43,6 +44,7 @@ if __name__ == "__main__":
         try:
             # Load image
             image = Image.open(image_file).convert("RGB")
+            image = T.ToTensor()(image)
             with open(out_jsonl, 'a') as f:
                 f.write(json.dumps(data) + '\n')
         except Exception as e:

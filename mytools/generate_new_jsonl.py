@@ -9,9 +9,9 @@ from multiprocessing import Pool, cpu_count
 
 
 # 图像文件夹路径
-image_folder = '/mnt/nas1/zhanghong/project/data-juicer/data/laion/diffusion_db'
+image_folder = '/mnt/nas1/zhanghong/project/data-juicer/data/laion/diffusion_db/images'
 # 输出 JSONL 文件路径
-output_file = '/mnt/nas1/zhanghong/project/data-juicer/data/laion/diffusion_db/generated_images.jsonl'
+output_file = '/mnt/nas1/zhanghong/project/data-juicer/data/laion/diffusion_db/generated_images_0312.jsonl'
 # 获取所有子文件夹的路径
 def get_subdirectories(root_dir):
     subdirs = []
@@ -35,7 +35,8 @@ def get_image_paths_in_dir(dir_path):
 # 获取所有图像文件的绝对路径
 def get_all_image_paths(image_folder, num_processes=cpu_count()):
     print(f"Starting to collect subdirectories from {image_folder} using {num_processes} processes...")
-    subdirs = get_subdirectories(image_folder)
+    # subdirs = get_subdirectories(image_folder)
+    subdirs = [image_folder]
     print(f"Finished collecting subdirectories. Total subdirectories found: {len(subdirs)}")
     
     print(f"Starting to collect image paths from subdirectories using {num_processes} processes...")

@@ -28,18 +28,19 @@ out_jsonls = [f'/mnt/nas1/zhanghong/data/laion/laion-hr_dj_40/dj_hr_out_{i}.json
 out_stats = [f'/mnt/nas1/zhanghong/data/laion/laion-hr_dj_40/dj_hr_out_{i}_stats.jsonl' for i in range(1, total_outs+1)]
 out_path = '/mnt/nas1/zhanghong/data/laion/datajuicer_output_hr'
 all_out = 'merged_output.jsonl'
-aes_6 = 'aes_6.jsonl'
+aes_num = 5.9
+aes = f'aes{aes_num}.jsonl'
 # 合并数据
 merged_data = merge_jsonl_files(out_jsonls, out_stats)
 
-# 将合并后的数据写入新的 JSONL 文件
-with open(os.path.join(out_path, all_out), 'w', encoding='utf-8') as outfile:
-    for item in merged_data:
-        outfile.write(json.dumps(item) + '\n')
-print(f"finished {all_out}")
+# # 将合并后的数据写入新的 JSONL 文件
+# with open(os.path.join(out_path, all_out), 'w', encoding='utf-8') as outfile:
+#     for item in merged_data:
+#         outfile.write(json.dumps(item) + '\n')
+# print(f"finished {all_out}")
 
-with open(os.path.join(out_path, aes_6), 'w', encoding='utf-8') as outfile:
+with open(os.path.join(out_path, aes), 'w', encoding='utf-8') as outfile:
     for item in merged_data:
-        if item['__dj__stats__']['image_aesthetics_scores'][0] >= 6:
+        if item['__dj__stats__']['image_aesthetics_scores'][0] >= aes_num:
             outfile.write(json.dumps(item) + '\n')
-print(f"finished {aes_6}")
+print(f"finished {aes}")
